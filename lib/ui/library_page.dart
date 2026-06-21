@@ -26,12 +26,12 @@ class _LibraryPageState extends State<LibraryPage> {
   String _q = '';
   Timer? _debounce;
 
-  late Future<List<Entry>> _future;
+  late Stream<List<Entry>> _stream;
 
   @override
   void initState() {
     super.initState();
-    _future = _query();
+    _stream = _buildStream();
   }
 
   @override
@@ -40,38 +40,39 @@ class _LibraryPageState extends State<LibraryPage> {
     super.dispose();
   }
 
-  Future<List<Entry>> _query() => AppScope.of(context).list(
+  Stream<List<Entry>> _buildStream() => AppScope.of(context).watch(
     category: _category,
     status: _status,
     q: _q,
     sort: _sort,
   );
 
-  void _reload() => setState(() => _future = _query());
+  // Rebuild the stream only when filters change. New/edited/deleted entries
+  // appear automatically because the stream is reactive, so navigating back
+  // from the add/detail screens needs no manual refresh.
+  void _applyFilters() => setState(() => _stream = _buildStream());
 
   void _onSearch(String value) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
       _q = value;
-      _reload();
+      _applyFilters();
     });
   }
 
   bool get _hasFilters =>
       _category != null || _status != null || _sort != SortKey.recent || _q.isNotEmpty;
 
-  Future<void> _openAdd() async {
-    await Navigator.of(context).push(
+  void _openAdd() {
+    Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const AddPage()),
     );
-    _reload();
   }
 
-  Future<void> _openEntry(String id) async {
-    await Navigator.of(context).push(
+  void _openEntry(String id) {
+    Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => EntryDetailPage(id: id)),
     );
-    _reload();
   }
 
   Future<void> _export() async {
@@ -131,35 +132,35 @@ class _LibraryPageState extends State<LibraryPage> {
             onSearch: _onSearch,
             onCategory: (c) => setState(() {
               _category = c;
-              _future = _query();
+              _stream = _buildStream();
             }),
             onStatus: (s) => setState(() {
               _status = s;
-              _future = _query();
+              _stream = _buildStream();
             }),
             onSort: (s) => setState(() {
               _sort = s;
-              _future = _query();
+              _stream = _buildStream();
             }),
             onClear: () => setState(() {
               _category = null;
               _status = null;
               _sort = SortKey.recent;
               _q = '';
-              _future = _query();
+              _stream = _buildStream();
             }),
           ),
           Expanded(
-            child: FutureBuilder<List<Entry>>(
-              future: _future,
+            child: StreamBuilder<List<Entry>>(
+              stream: _stream,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
-                final entries = snapshot.data ?? [];
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final entries = snapshot.data!;
                 if (entries.isEmpty) {
                   return Center(
                     child: Text(

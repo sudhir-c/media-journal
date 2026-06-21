@@ -16,12 +16,13 @@ class EntryRepository {
   EntryRepository(this.db);
   final AppDatabase db;
 
-  Future<List<Entry>> list({
+  /// Builds the filtered/ordered query shared by [list] and [watch].
+  SimpleSelectStatement<$EntriesTable, Entry> _select({
     Category? category,
     Status? status,
     String? q,
     SortKey sort = SortKey.recent,
-  }) async {
+  }) {
     final query = db.select(db.entries);
 
     if (category != null) {
@@ -51,18 +52,48 @@ class EntryRepository {
       case SortKey.overall:
         query.orderBy([(t) => OrderingTerm.desc(t.createdAt)]);
     }
+    return query;
+  }
 
-    var rows = await query.get();
+  /// Derived score isn't a column; sort in Dart. Unrated entries sort last.
+  List<Entry> _applyOverallSort(List<Entry> rows, SortKey sort) {
+    if (sort != SortKey.overall) return rows;
+    return [...rows]..sort((a, b) {
+      final av = a.overallScore ?? double.negativeInfinity;
+      final bv = b.overallScore ?? double.negativeInfinity;
+      return bv.compareTo(av);
+    });
+  }
 
-    if (sort == SortKey.overall) {
-      // Derived score isn't a column; sort in Dart. Unrated entries sort last.
-      rows = [...rows]..sort((a, b) {
-        final av = a.overallScore ?? double.negativeInfinity;
-        final bv = b.overallScore ?? double.negativeInfinity;
-        return bv.compareTo(av);
-      });
-    }
-    return rows;
+  Future<List<Entry>> list({
+    Category? category,
+    Status? status,
+    String? q,
+    SortKey sort = SortKey.recent,
+  }) async {
+    final rows = await _select(
+      category: category,
+      status: status,
+      q: q,
+      sort: sort,
+    ).get();
+    return _applyOverallSort(rows, sort);
+  }
+
+  /// Reactive version of [list]: emits a fresh list whenever the underlying
+  /// table changes (create/update/delete), so the UI never goes stale.
+  Stream<List<Entry>> watch({
+    Category? category,
+    Status? status,
+    String? q,
+    SortKey sort = SortKey.recent,
+  }) {
+    return _select(
+      category: category,
+      status: status,
+      q: q,
+      sort: sort,
+    ).watch().map((rows) => _applyOverallSort(rows, sort));
   }
 
   Future<Entry?> getById(String id) {

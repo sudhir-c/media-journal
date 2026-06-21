@@ -1,0 +1,12 @@
+#include "../../Flutter/Flutter-Debug.xcconfig"
+#include "Warnings.xcconfig"
+
+// Local debug builds: skip code signing. The project lives under an
+// iCloud-synced folder (~/Desktop), whose daemon re-stamps the .app bundle
+// with com.apple.FinderInfo / fileprovider xattrs that `codesign` rejects
+// ("resource fork, Finder information, or similar detritus not allowed").
+// Unsigned debug builds run fine locally. For a signed release, build from a
+// non-synced path (e.g. ~/dev) or re-enable signing.
+CODE_SIGNING_ALLOWED = NO
+CODE_SIGNING_REQUIRED = NO
+CODE_SIGN_IDENTITY =

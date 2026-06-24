@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../app_scope.dart';
 import '../../core/categories.dart';
 import '../../data/entry_input.dart';
+import '../theme/app_text.dart';
+import '../theme/tokens.dart';
+import 'common.dart';
 import 'rating_input.dart';
 
 /// Config-driven create/edit form. Renders rating axes from [categoryAxes]
@@ -61,9 +64,9 @@ class _EntryFormState extends State<EntryForm> {
   }
 
   String get _creatorsLabel => switch (_category) {
-    Category.movie => 'Director(s)',
-    Category.tv => 'Creator(s)',
-    _ => 'Author(s)',
+    Category.movie => 'Director',
+    Category.tv => 'Creator',
+    _ => 'Author',
   };
 
   Future<void> _pickDate() async {
@@ -139,119 +142,80 @@ class _EntryFormState extends State<EntryForm> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: error ? Theme.of(context).colorScheme.error : null,
-        behavior: SnackBarBehavior.floating,
+        backgroundColor: error ? AppColors.danger : null,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionRow([
-          Text('Category', style: theme.textTheme.bodySmall),
-          const SizedBox(width: 8),
-          Chip(
-            label: Text(_category.label),
-            visualDensity: VisualDensity.compact,
-          ),
-        ]),
-        const SizedBox(height: 16),
+        AppChip(_category.label),
+        const SizedBox(height: AppSpacing.lg),
+
+        const SectionLabel('Details'),
+        const SizedBox(height: AppSpacing.sm),
         TextField(
           controller: _title,
+          style: AppText.body(context),
           decoration: InputDecoration(
             labelText: 'Title',
-            border: const OutlineInputBorder(),
             errorText: _errors['title'],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.sm),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: TextField(
                 controller: _creators,
-                decoration: InputDecoration(
-                  labelText: _creatorsLabel,
-                  border: const OutlineInputBorder(),
-                ),
+                style: AppText.body(context),
+                decoration: InputDecoration(labelText: _creatorsLabel),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.sm),
             SizedBox(
-              width: 120,
+              width: 110,
               child: TextField(
                 controller: _year,
                 keyboardType: TextInputType.number,
+                style: AppText.body(context),
                 decoration: InputDecoration(
                   labelText: 'Year',
-                  border: const OutlineInputBorder(),
                   errorText: _errors['year'],
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.sm),
         Row(
           children: [
-            Expanded(
-              child: DropdownButtonFormField<Status>(
-                initialValue: _status,
-                decoration: const InputDecoration(
-                  labelText: 'Status',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  for (final s in Status.values)
-                    DropdownMenuItem(value: s, child: Text(s.label)),
-                ],
-                onChanged: (v) => setState(() => _status = v ?? Status.done),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: InkWell(
-                onTap: _pickDate,
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: 'Date consumed',
-                    border: const OutlineInputBorder(),
-                    errorText: _errors['consumedDate'],
-                    suffixIcon: _consumedDate != null
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () =>
-                                setState(() => _consumedDate = null),
-                          )
-                        : const Icon(Icons.calendar_today, size: 18),
-                  ),
-                  child: Text(_consumedDate ?? 'Not set'),
-                ),
-              ),
-            ),
+            Expanded(child: _statusField()),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: _dateField()),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.sm),
         TextField(
           controller: _coverUrl,
+          style: AppText.body(context),
           decoration: InputDecoration(
             labelText: 'Cover image URL',
             hintText: 'https://…',
-            border: const OutlineInputBorder(),
             errorText: _errors['coverUrl'],
           ),
         ),
-        const SizedBox(height: 24),
-        _sectionTitle('Ratings (1–10)'),
-        const SizedBox(height: 12),
+
+        const SizedBox(height: AppSpacing.xl),
+        const SectionLabel('Ratings'),
+        const SizedBox(height: AppSpacing.md),
         ..._category.axes.map(
           (axis) => Padding(
-            padding: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
             child: RatingInput(
               label: axis.label,
               value: _axes[axis.key],
@@ -260,48 +224,28 @@ class _EntryFormState extends State<EntryForm> {
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        _sectionTitle('Reactions'),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _pro,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'What worked',
-            border: OutlineInputBorder(),
-            alignLabelWithHint: true,
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _con,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: "What didn't",
-            border: OutlineInputBorder(),
-            alignLabelWithHint: true,
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _notes,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            labelText: 'Notes',
-            border: OutlineInputBorder(),
-            alignLabelWithHint: true,
-          ),
-        ),
-        const SizedBox(height: 20),
+
+        const SizedBox(height: AppSpacing.md),
+        const SectionLabel('Reflections'),
+        const SizedBox(height: AppSpacing.sm),
+        _reflection(_pro, 'What worked', 3),
+        const SizedBox(height: AppSpacing.sm),
+        _reflection(_con, "What didn't", 3),
+        const SizedBox(height: AppSpacing.sm),
+        _reflection(_notes, 'Notes', 4),
+
+        const SizedBox(height: AppSpacing.xl),
         Row(
           children: [
-            FilledButton(
-              onPressed: _saving ? null : _submit,
-              child: Text(_saving ? 'Saving…' : widget.submitLabel),
+            Expanded(
+              child: FilledButton(
+                onPressed: _saving ? null : _submit,
+                child: Text(_saving ? 'Saving…' : widget.submitLabel),
+              ),
             ),
             if (widget.onCancel != null) ...[
-              const SizedBox(width: 8),
-              TextButton(
+              const SizedBox(width: AppSpacing.sm),
+              OutlinedButton(
                 onPressed: _saving ? null : widget.onCancel,
                 child: const Text('Cancel'),
               ),
@@ -312,15 +256,56 @@ class _EntryFormState extends State<EntryForm> {
     );
   }
 
-  Widget _sectionRow(List<Widget> children) =>
-      Row(children: children);
+  Widget _reflection(TextEditingController c, String label, int lines) {
+    return TextField(
+      controller: c,
+      maxLines: lines,
+      style: AppText.body(context),
+      decoration: InputDecoration(
+        labelText: label,
+        alignLabelWithHint: true,
+      ),
+    );
+  }
 
-  Widget _sectionTitle(String text) => Text(
-    text.toUpperCase(),
-    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-      letterSpacing: 0.8,
-      color: Theme.of(context).colorScheme.outline,
-      fontWeight: FontWeight.w600,
-    ),
-  );
+  Widget _statusField() {
+    return DropdownButtonFormField<Status>(
+      initialValue: _status,
+      isExpanded: true,
+      style: AppText.body(context),
+      decoration: const InputDecoration(labelText: 'Status'),
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      items: [
+        for (final s in Status.values)
+          DropdownMenuItem(value: s, child: Text(s.label)),
+      ],
+      onChanged: (v) => setState(() => _status = v ?? Status.done),
+    );
+  }
+
+  Widget _dateField() {
+    return InkWell(
+      onTap: _pickDate,
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Consumed',
+          errorText: _errors['consumedDate'],
+          suffixIcon: _consumedDate != null
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 16),
+                  onPressed: () => setState(() => _consumedDate = null),
+                )
+              : const Icon(Icons.calendar_today_outlined, size: 16),
+        ),
+        child: Text(
+          _consumedDate ?? 'Not set',
+          style: AppText.body(
+            context,
+            color: _consumedDate == null ? AppColors.inkFaint : AppColors.ink,
+          ),
+        ),
+      ),
+    );
+  }
 }

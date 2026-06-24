@@ -5,6 +5,9 @@ import '../app_scope.dart';
 import '../core/format.dart';
 import '../data/stats.dart';
 import 'entry_detail_page.dart';
+import 'theme/app_text.dart';
+import 'theme/tokens.dart';
+import 'widgets/common.dart';
 
 class StatsPage extends StatefulWidget {
   const StatsPage({super.key});
@@ -30,7 +33,13 @@ class _StatsPageState extends State<StatsPage> {
         if (stats == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('Stats')),
-            body: const Center(child: CircularProgressIndicator()),
+            body: const Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
           );
         }
         return DefaultTabController(
@@ -40,9 +49,15 @@ class _StatsPageState extends State<StatsPage> {
               title: const Text('Stats'),
               bottom: TabBar(
                 isScrollable: true,
-                tabs: [
-                  for (final s in stats) Tab(text: '${s.label} (${s.count})'),
-                ],
+                tabAlignment: TabAlignment.start,
+                indicatorColor: AppColors.ink,
+                indicatorWeight: 2,
+                labelColor: AppColors.ink,
+                unselectedLabelColor: AppColors.inkFaint,
+                labelStyle: AppText.label(context).copyWith(fontWeight: FontWeight.w600),
+                unselectedLabelStyle: AppText.label(context),
+                dividerColor: AppColors.line,
+                tabs: [for (final s in stats) Tab(text: s.label)],
               ),
             ),
             body: TabBarView(
@@ -66,64 +81,59 @@ class _CategoryPanel extends StatelessWidget {
       return Center(
         child: Text(
           'No ${stats.label.toLowerCase()} entries yet.',
-          style: TextStyle(color: Theme.of(context).colorScheme.outline),
+          style: AppText.meta(context),
         ),
       );
     }
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.huge,
+      ),
       children: [
         Row(
           children: [
             _Stat(label: 'Entries', value: '${stats.count}'),
-            const SizedBox(width: 12),
             _Stat(label: 'Rated', value: '${stats.ratedCount}'),
-            const SizedBox(width: 12),
-            _Stat(
-              label: 'Avg overall',
-              value: formatScore(stats.averageOverall),
-            ),
+            _Stat(label: 'Avg overall', value: formatScore(stats.averageOverall)),
           ],
         ),
-        const SizedBox(height: 20),
-        _ChartCard(
-          title: 'Average by axis',
-          child: Column(children: [for (final a in stats.axisAverages) _AxisBar(a)]),
-        ),
-        _ChartCard(
-          title: 'Score distribution',
-          child: SizedBox(height: 220, child: _DistributionChart(stats.distribution)),
-        ),
-        _ChartCard(
-          title: 'Entries over time',
-          child: stats.overTime.isEmpty
-              ? _empty(context, 'No consumed dates recorded.')
-              : SizedBox(height: 220, child: _OverTimeChart(stats.overTime)),
-        ),
-        _ChartCard(
-          title: 'Top rated',
-          child: stats.topRated.isEmpty
-              ? _empty(context, 'Nothing rated yet.')
-              : Column(
-                  children: [
-                    for (var i = 0; i < stats.topRated.length; i++)
-                      _TopRow(rank: i + 1, entry: stats.topRated[i]),
-                  ],
-                ),
-        ),
+        const SizedBox(height: AppSpacing.xxl),
+
+        const SectionLabel('Average by axis'),
+        const SizedBox(height: AppSpacing.md),
+        for (final a in stats.axisAverages)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: _AxisBar(label: a.label, average: a.average),
+          ),
+
+        const SizedBox(height: AppSpacing.xl),
+        const SectionLabel('Score distribution'),
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(height: 200, child: _DistributionChart(stats.distribution)),
+
+        const SizedBox(height: AppSpacing.xl),
+        const SectionLabel('Over time'),
+        const SizedBox(height: AppSpacing.md),
+        if (stats.overTime.isEmpty)
+          Text('No consumed dates recorded.', style: AppText.meta(context))
+        else
+          SizedBox(height: 200, child: _OverTimeChart(stats.overTime)),
+
+        const SizedBox(height: AppSpacing.xl),
+        const SectionLabel('Top rated'),
+        const SizedBox(height: AppSpacing.xs),
+        if (stats.topRated.isEmpty)
+          Text('Nothing rated yet.', style: AppText.meta(context))
+        else
+          for (var i = 0; i < stats.topRated.length; i++)
+            _TopRow(rank: i + 1, entry: stats.topRated[i]),
       ],
     );
   }
-
-  Widget _empty(BuildContext context, String text) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 24),
-    child: Center(
-      child: Text(
-        text,
-        style: TextStyle(color: Theme.of(context).colorScheme.outline),
-      ),
-    ),
-  );
 }
 
 class _Stat extends StatelessWidget {
@@ -134,101 +144,58 @@ class _Stat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              value,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.outline,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ChartCard extends StatelessWidget {
-  const _ChartCard({required this.title, required this.child});
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            child,
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(value, style: AppText.title(context).copyWith(fontSize: 34)),
+          const SizedBox(height: 4),
+          SectionLabel(label),
+        ],
       ),
     );
   }
 }
 
 class _AxisBar extends StatelessWidget {
-  const _AxisBar(this.axis);
-  final AxisAverage axis;
+  const _AxisBar({required this.label, required this.average});
+  final String label;
+  final double? average;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final value = axis.average ?? 0;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 150,
-            child: Text(axis.label, style: const TextStyle(fontSize: 13)),
-          ),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: value / 10,
-                minHeight: 16,
-                backgroundColor: scheme.surfaceContainerHighest,
-                valueColor: AlwaysStoppedAnimation(scheme.primary),
-              ),
+    final v = average ?? 0;
+    return Row(
+      children: [
+        SizedBox(
+          width: 150,
+          child: Text(label, style: AppText.body(context)),
+        ),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.pill),
+            child: Stack(
+              children: [
+                Container(height: 8, color: AppColors.fill),
+                FractionallySizedBox(
+                  widthFactor: (v / 10).clamp(0, 1),
+                  child: Container(height: 8, color: AppColors.ink),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 36,
-            child: Text(
-              axis.average == null ? '—' : value.toStringAsFixed(1),
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
+        ),
+        SizedBox(
+          width: 44,
+          child: Text(
+            average == null ? '—' : v.toStringAsFixed(1),
+            textAlign: TextAlign.right,
+            style: AppText.label(context).copyWith(
+              fontWeight: FontWeight.w600,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -239,7 +206,6 @@ class _DistributionChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final maxCount = buckets.fold<int>(0, (m, b) => b.count > m ? b.count : m);
     final maxY = (maxCount < 1 ? 1 : maxCount).toDouble();
     return BarChart(
@@ -253,40 +219,38 @@ class _DistributionChart extends StatelessWidget {
               barRods: [
                 BarChartRodData(
                   toY: b.count.toDouble(),
-                  color: scheme.primary,
-                  width: 14,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(3),
-                  ),
+                  color: AppColors.ink,
+                  width: 13,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
                 ),
               ],
             ),
         ],
-        gridData: const FlGridData(show: true, drawVerticalLine: false),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (_) =>
+              const FlLine(color: AppColors.line, strokeWidth: 1),
+        ),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 28,
+              reservedSize: 26,
               interval: maxY <= 5 ? 1 : null,
-              getTitlesWidget: (value, meta) =>
-                  value == value.roundToDouble()
-                  ? Text('${value.toInt()}',
-                      style: const TextStyle(fontSize: 11))
+              getTitlesWidget: (value, _) => value == value.roundToDouble()
+                  ? Text('${value.toInt()}', style: _axisStyle(context))
                   : const SizedBox.shrink(),
             ),
           ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              getTitlesWidget: (value, meta) => Text(
-                '${value.toInt()}',
-                style: const TextStyle(fontSize: 11),
-              ),
+              getTitlesWidget: (value, _) =>
+                  Text('${value.toInt()}', style: _axisStyle(context)),
             ),
           ),
         ),
@@ -301,7 +265,6 @@ class _OverTimeChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final maxCount = points.fold<int>(0, (m, p) => p.count > m ? p.count : m);
     final maxY = (maxCount < 1 ? 1 : maxCount).toDouble();
     return LineChart(
@@ -315,26 +278,36 @@ class _OverTimeChart extends StatelessWidget {
                 FlSpot(i.toDouble(), points[i].count.toDouble()),
             ],
             isCurved: true,
-            color: scheme.primary,
+            color: AppColors.ink,
             barWidth: 2,
-            dotData: const FlDotData(show: true),
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, _, __, ___) => FlDotCirclePainter(
+                radius: 3,
+                color: AppColors.ink,
+                strokeWidth: 0,
+              ),
+            ),
           ),
         ],
-        gridData: const FlGridData(show: true),
+        gridData: FlGridData(
+          show: true,
+          getDrawingHorizontalLine: (_) =>
+              const FlLine(color: AppColors.line, strokeWidth: 1),
+          getDrawingVerticalLine: (_) =>
+              const FlLine(color: AppColors.line, strokeWidth: 1),
+        ),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 28,
+              reservedSize: 26,
               interval: maxY <= 5 ? 1 : null,
-              getTitlesWidget: (value, meta) =>
-                  value == value.roundToDouble()
-                  ? Text('${value.toInt()}',
-                      style: const TextStyle(fontSize: 11))
+              getTitlesWidget: (value, _) => value == value.roundToDouble()
+                  ? Text('${value.toInt()}', style: _axisStyle(context))
                   : const SizedBox.shrink(),
             ),
           ),
@@ -342,17 +315,14 @@ class _OverTimeChart extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 28,
-              getTitlesWidget: (value, meta) {
+              getTitlesWidget: (value, _) {
                 final i = value.round();
                 if (i < 0 || i >= points.length || i != value) {
                   return const SizedBox.shrink();
                 }
                 return Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    points[i].month,
-                    style: const TextStyle(fontSize: 9),
-                  ),
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(points[i].month, style: _axisStyle(context)),
                 );
               },
             ),
@@ -363,6 +333,9 @@ class _OverTimeChart extends StatelessWidget {
   }
 }
 
+TextStyle _axisStyle(BuildContext context) =>
+    AppText.meta(context, color: AppColors.inkFaint).copyWith(fontSize: 11);
+
 class _TopRow extends StatelessWidget {
   const _TopRow({required this.rank, required this.entry});
   final int rank;
@@ -372,20 +345,21 @@ class _TopRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => EntryDetailPage(id: entry.id),
-        ),
+        MaterialPageRoute<void>(builder: (_) => EntryDetailPage(id: entry.id)),
       ),
-      borderRadius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      borderRadius: BorderRadius.circular(AppRadii.sm),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: 2),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppColors.line)),
+        ),
         child: Row(
           children: [
             SizedBox(
-              width: 24,
+              width: 28,
               child: Text(
-                '$rank.',
-                style: TextStyle(color: Theme.of(context).colorScheme.outline),
+                '$rank',
+                style: AppText.meta(context, color: AppColors.inkFaint),
               ),
             ),
             Expanded(
@@ -393,11 +367,15 @@ class _TopRow extends StatelessWidget {
                 entry.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                style: AppText.body(context),
               ),
             ),
             Text(
               formatScore(entry.overall),
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: AppText.label(context).copyWith(
+                fontWeight: FontWeight.w600,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ],
         ),

@@ -3,14 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
-import '../core/categories.dart';
+import '../core/categories.dart' hide Axis;
 import '../data/database.dart';
 import '../data/entry_repository.dart';
 import '../data/export.dart';
 import 'add_page.dart';
 import 'entry_detail_page.dart';
 import 'stats_page.dart';
+import 'theme/app_text.dart';
+import 'theme/tokens.dart';
+import 'widgets/common.dart';
 import 'widgets/entry_card.dart';
+import 'widgets/reveal.dart';
 
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
@@ -48,20 +52,22 @@ class _LibraryPageState extends State<LibraryPage> {
   );
 
   // Rebuild the stream only when filters change. New/edited/deleted entries
-  // appear automatically because the stream is reactive, so navigating back
-  // from the add/detail screens needs no manual refresh.
+  // appear automatically because the stream is reactive.
   void _applyFilters() => setState(() => _stream = _buildStream());
 
   void _onSearch(String value) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
+    _debounce = Timer(const Duration(milliseconds: 280), () {
       _q = value;
       _applyFilters();
     });
   }
 
   bool get _hasFilters =>
-      _category != null || _status != null || _sort != SortKey.recent || _q.isNotEmpty;
+      _category != null ||
+      _status != null ||
+      _sort != SortKey.recent ||
+      _q.isNotEmpty;
 
   void _openAdd() {
     Navigator.of(context).push(
@@ -82,114 +88,166 @@ class _LibraryPageState extends State<LibraryPage> {
       final saved = await exportEntriesToFile(repo);
       messenger.showSnackBar(
         SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(saved == null ? 'Export cancelled' : 'Exported to $saved'),
+          content: Text(
+            saved == null ? 'Export cancelled' : 'Exported to $saved',
+          ),
         ),
       );
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text('Export failed: $e'),
-        ),
-      );
+      messenger.showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Media Journal'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bar_chart),
-            tooltip: 'Stats',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const StatsPage()),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.download),
-            tooltip: 'Export JSON',
-            onPressed: _export,
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAdd,
-        icon: const Icon(Icons.add),
-        label: const Text('Add entry'),
-      ),
-      body: Column(
-        children: [
-          _FilterBar(
-            category: _category,
-            status: _status,
-            sort: _sort,
-            hasFilters: _hasFilters,
-            onSearch: _onSearch,
-            onCategory: (c) => setState(() {
-              _category = c;
-              _stream = _buildStream();
-            }),
-            onStatus: (s) => setState(() {
-              _status = s;
-              _stream = _buildStream();
-            }),
-            onSort: (s) => setState(() {
-              _sort = s;
-              _stream = _buildStream();
-            }),
-            onClear: () => setState(() {
-              _category = null;
-              _status = null;
-              _sort = SortKey.recent;
-              _q = '';
-              _stream = _buildStream();
-            }),
-          ),
-          Expanded(
-            child: StreamBuilder<List<Entry>>(
-              stream: _stream,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final entries = snapshot.data!;
-                if (entries.isEmpty) {
-                  return Center(
-                    child: Text(
-                      _hasFilters
-                          ? 'No entries match these filters.'
-                          : 'Nothing logged yet. Tap “Add entry”.',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
+      floatingActionButton: _NewEntryButton(onTap: _openAdd),
+      body: SafeArea(
+        child: StreamBuilder<List<Entry>>(
+          stream: _stream,
+          builder: (context, snapshot) {
+            final entries = snapshot.data;
+            return CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _Masthead(
+                    count: entries?.length,
+                    onStats: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => const StatsPage()),
                     ),
-                  );
-                }
-                return GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                  gridDelegate:
-                      const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 200,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 0.52,
+                    onExport: _export,
                   ),
-                  itemCount: entries.length,
-                  itemBuilder: (context, i) => EntryCard(
-                    entry: entries[i],
-                    onTap: () => _openEntry(entries[i].id),
+                ),
+                if (entries == null || (entries.isNotEmpty || _hasFilters))
+                  SliverToBoxAdapter(
+                    child: _Filters(
+                      category: _category,
+                      status: _status,
+                      sort: _sort,
+                      hasFilters: _hasFilters,
+                      onSearch: _onSearch,
+                      onCategory: (c) {
+                        _category = c;
+                        _applyFilters();
+                      },
+                      onStatus: (s) {
+                        _status = s;
+                        _applyFilters();
+                      },
+                      onSort: (s) {
+                        _sort = s;
+                        _applyFilters();
+                      },
+                      onClear: () {
+                        setState(() {
+                          _category = null;
+                          _status = null;
+                          _sort = SortKey.recent;
+                          _q = '';
+                          _stream = _buildStream();
+                        });
+                      },
+                    ),
                   ),
-                );
-              },
+                _body(context, entries),
+                const SliverToBoxAdapter(child: SizedBox(height: 120)),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _body(BuildContext context, List<Entry>? entries) {
+    if (entries == null) {
+      return const SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    if (entries.isEmpty) {
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: _EmptyState(filtered: _hasFilters, onAdd: _openAdd),
+      );
+    }
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.xs,
+        AppSpacing.lg,
+        AppSpacing.lg,
+      ),
+      sliver: SliverGrid(
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 188,
+          mainAxisSpacing: AppSpacing.xl,
+          crossAxisSpacing: AppSpacing.lg,
+          childAspectRatio: 0.52,
+        ),
+        delegate: SliverChildBuilderDelegate((context, i) {
+          return Reveal(
+            delay: Duration(milliseconds: (i % 12) * 35),
+            child: EntryCard(
+              entry: entries[i],
+              onTap: () => _openEntry(entries[i].id),
             ),
+          );
+        }, childCount: entries.length),
+      ),
+    );
+  }
+}
+
+// ───────────────────────────────────────────────────────────── masthead ────
+
+class _Masthead extends StatelessWidget {
+  const _Masthead({
+    required this.count,
+    required this.onStats,
+    required this.onExport,
+  });
+
+  final int? count;
+  final VoidCallback onStats;
+  final VoidCallback onExport;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.md,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const SectionLabel('Media Journal'),
+              const Spacer(),
+              _BarAction(icon: Icons.bar_chart_outlined, label: 'Stats', onTap: onStats),
+              const SizedBox(width: AppSpacing.xs),
+              _BarAction(icon: Icons.ios_share_outlined, label: 'Export', onTap: onExport),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text('Library', style: AppText.display(context)),
+          const SizedBox(height: 6),
+          Text(
+            count == null
+                ? ' '
+                : '$count ${count == 1 ? 'entry' : 'entries'}',
+            style: AppText.meta(context),
           ),
         ],
       ),
@@ -197,8 +255,36 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 }
 
-class _FilterBar extends StatelessWidget {
-  const _FilterBar({
+class _BarAction extends StatelessWidget {
+  const _BarAction({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.pill),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: AppColors.inkSoft),
+            const SizedBox(width: 6),
+            Text(label, style: AppText.label(context, color: AppColors.inkSoft)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ────────────────────────────────────────────────────────────── filters ────
+
+class _Filters extends StatelessWidget {
+  const _Filters({
     required this.category,
     required this.status,
     required this.sort,
@@ -230,60 +316,231 @@ class _FilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        0,
+        AppSpacing.lg,
+        AppSpacing.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Category as a quiet text segmented control.
           SizedBox(
-            width: 260,
-            child: TextField(
-              onChanged: onSearch,
-              decoration: const InputDecoration(
-                isDense: true,
-                prefixIcon: Icon(Icons.search, size: 20),
-                hintText: 'Search title or creator…',
-                border: OutlineInputBorder(),
+            height: 36,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                _Segment(
+                  label: 'All',
+                  selected: category == null,
+                  onTap: () => onCategory(null),
+                ),
+                for (final c in categories)
+                  _Segment(
+                    label: c.label,
+                    selected: category == c,
+                    onTap: () => onCategory(c),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: onSearch,
+                  style: AppText.body(context),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    prefixIcon: Icon(Icons.search, size: 18, color: AppColors.inkFaint),
+                    hintText: 'Search title or creator',
+                  ),
+                ),
               ),
-            ),
-          ),
-          DropdownMenu<Category?>(
-            initialSelection: category,
-            label: const Text('Category'),
-            onSelected: onCategory,
-            dropdownMenuEntries: [
-              const DropdownMenuEntry(value: null, label: 'All categories'),
-              for (final c in categories)
-                DropdownMenuEntry(value: c, label: c.label),
+              const SizedBox(width: AppSpacing.sm),
+              _MenuButton<Status?>(
+                value: status,
+                label: status?.label ?? 'All statuses',
+                items: [
+                  const PopupMenuItem(value: null, child: Text('All statuses')),
+                  for (final s in Status.values)
+                    PopupMenuItem(value: s, child: Text(s.label)),
+                ],
+                onSelected: onStatus,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              _MenuButton<SortKey>(
+                value: sort,
+                label: _sortLabels[sort]!,
+                items: [
+                  for (final e in _sortLabels.entries)
+                    PopupMenuItem(value: e.key, child: Text(e.value)),
+                ],
+                onSelected: (v) => onSort(v ?? SortKey.recent),
+              ),
+              if (hasFilters)
+                IconButton(
+                  tooltip: 'Clear filters',
+                  icon: const Icon(Icons.close, size: 18, color: AppColors.inkSoft),
+                  onPressed: onClear,
+                ),
             ],
           ),
-          DropdownMenu<Status?>(
-            initialSelection: status,
-            label: const Text('Status'),
-            onSelected: onStatus,
-            dropdownMenuEntries: [
-              const DropdownMenuEntry(value: null, label: 'All statuses'),
-              for (final s in Status.values)
-                DropdownMenuEntry(value: s, label: s.label),
-            ],
-          ),
-          DropdownMenu<SortKey>(
-            initialSelection: sort,
-            label: const Text('Sort'),
-            onSelected: (v) => onSort(v ?? SortKey.recent),
-            dropdownMenuEntries: [
-              for (final entry in _sortLabels.entries)
-                DropdownMenuEntry(value: entry.key, label: entry.value),
-            ],
-          ),
-          if (hasFilters)
-            TextButton.icon(
-              onPressed: onClear,
-              icon: const Icon(Icons.clear, size: 18),
-              label: const Text('Clear'),
-            ),
         ],
+      ),
+    );
+  }
+}
+
+class _Segment extends StatelessWidget {
+  const _Segment({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.ink : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadii.pill),
+          ),
+          child: Text(
+            label,
+            style: AppText.label(context).copyWith(
+              color: selected ? AppColors.paper : AppColors.inkSoft,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuButton<T> extends StatelessWidget {
+  const _MenuButton({
+    required this.value,
+    required this.label,
+    required this.items,
+    required this.onSelected,
+  });
+
+  final T value;
+  final String label;
+  final List<PopupMenuEntry<T>> items;
+  final ValueChanged<T?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<T>(
+      initialValue: value,
+      onSelected: onSelected,
+      position: PopupMenuPosition.under,
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        side: const BorderSide(color: AppColors.line),
+      ),
+      itemBuilder: (_) => items,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          border: Border.all(color: AppColors.line),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: AppText.label(context, color: AppColors.inkSoft)),
+            const SizedBox(width: 4),
+            const Icon(Icons.expand_more, size: 16, color: AppColors.inkFaint),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────── empty / fab ────
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.filtered, required this.onAdd});
+
+  final bool filtered;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              filtered ? Icons.search_off_outlined : Icons.auto_stories_outlined,
+              size: 40,
+              color: AppColors.inkFaint,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              filtered ? 'Nothing matches' : 'Your library is empty',
+              style: AppText.headline(context),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              filtered
+                  ? 'Try a different search or clear your filters.'
+                  : 'Add the first film or book you want to remember.',
+              textAlign: TextAlign.center,
+              style: AppText.meta(context),
+            ),
+            if (!filtered) ...[
+              const SizedBox(height: AppSpacing.lg),
+              FilledButton(onPressed: onAdd, child: const Text('Add an entry')),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NewEntryButton extends StatelessWidget {
+  const _NewEntryButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return FloatingActionButton.extended(
+      onPressed: onTap,
+      backgroundColor: AppColors.ink,
+      foregroundColor: AppColors.paper,
+      elevation: 2,
+      highlightElevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+      ),
+      icon: const Icon(Icons.add, size: 20),
+      label: Text(
+        'New entry',
+        style: AppText.label(context, color: AppColors.paper).copyWith(
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/categories.dart';
 import '../../providers/provider_facade.dart';
+import '../theme/app_text.dart';
+import '../theme/tokens.dart';
 import 'cover_image.dart';
 
 /// Step 2 of the add flow: search a provider, or fall back to manual entry.
@@ -34,9 +36,9 @@ class _ProviderSearchState extends State<ProviderSearch> {
   }
 
   String get _hint => switch (widget.category) {
-    Category.tv => 'Search TV shows…',
-    Category.movie => 'Search movies…',
-    _ => 'Search books…',
+    Category.tv => 'Search TV shows',
+    Category.movie => 'Search movies',
+    _ => 'Search books',
   };
 
   Future<void> _search() async {
@@ -65,16 +67,14 @@ class _ProviderSearchState extends State<ProviderSearch> {
     } catch (_) {
       if (!mounted) return;
       _toast("Couldn't load full details — using search result.");
-      widget.onPick(r); // graceful fallback to search-result data
+      widget.onPick(r);
     } finally {
       if (mounted) setState(() => _pickingId = null);
     }
   }
 
   void _toast(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -89,84 +89,44 @@ class _ProviderSearchState extends State<ProviderSearch> {
               child: TextField(
                 controller: _controller,
                 autofocus: true,
+                style: AppText.body(context),
                 onSubmitted: (_) => _search(),
                 decoration: InputDecoration(
                   hintText: _hint,
-                  border: const OutlineInputBorder(),
-                  isDense: true,
+                  prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.inkFaint),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            FilledButton.icon(
+            const SizedBox(width: AppSpacing.sm),
+            FilledButton(
               onPressed: _searching ? null : _search,
-              icon: _searching
+              child: _searching
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.paper,
+                      ),
                     )
-                  : const Icon(Icons.search, size: 18),
-              label: const Text('Search'),
+                  : const Text('Search'),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
         if (results != null)
-          results.isEmpty
-              ? Text(
-                  'No results. Try another search or enter it manually.',
-                  style: TextStyle(color: Theme.of(context).colorScheme.outline),
-                )
-              : Card(
-                  margin: EdgeInsets.zero,
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    children: [
-                      for (final r in results)
-                        ListTile(
-                          leading: SizedBox(
-                            width: 36,
-                            height: 54,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: CoverImage(url: r.coverUrl, iconSize: 18),
-                            ),
-                          ),
-                          title: Text(
-                            r.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            [
-                              r.creators,
-                              if (r.year != null) '${r.year}',
-                            ].where((s) => s.isNotEmpty).join(' · '),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: _pickingId == r.externalId
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : null,
-                          onTap: _pickingId == null ? () => _pick(r) : null,
-                        ),
-                    ],
-                  ),
-                ),
-        const SizedBox(height: 16),
+          if (results.isEmpty)
+            Text(
+              'No results. Try another search, or enter it manually below.',
+              style: AppText.meta(context),
+            )
+          else
+            ...results.map(_resultRow),
+        const SizedBox(height: AppSpacing.lg),
         Row(
           children: [
-            Text(
-              "Can't find it?",
-              style: TextStyle(color: Theme.of(context).colorScheme.outline),
-            ),
-            const SizedBox(width: 8),
+            Text("Can't find it?", style: AppText.meta(context)),
+            const SizedBox(width: AppSpacing.sm),
             OutlinedButton(
               onPressed: widget.onManual,
               child: const Text('Enter manually'),
@@ -174,6 +134,60 @@ class _ProviderSearchState extends State<ProviderSearch> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _resultRow(NormalizedResult r) {
+    final busy = _pickingId == r.externalId;
+    final meta = [
+      r.creators,
+      if (r.year != null) '${r.year}',
+    ].where((s) => s.isNotEmpty).join('  ·  ');
+
+    return InkWell(
+      onTap: _pickingId == null ? () => _pick(r) : null,
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 44,
+              child: PosterFrame(url: r.coverUrl, elevated: false, radius: 6),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    r.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.cardTitle(context).copyWith(fontSize: 15),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    meta.isEmpty ? '—' : meta,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.meta(context),
+                  ),
+                ],
+              ),
+            ),
+            if (busy)
+              const Padding(
+                padding: EdgeInsets.only(left: AppSpacing.sm),
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../core/categories.dart';
-import '../../core/format.dart';
 import '../../data/database.dart';
 import '../../data/entry_domain.dart';
+import '../theme/app_text.dart';
+import '../theme/tokens.dart';
+import 'common.dart';
 import 'cover_image.dart';
 
+/// A single library cell: a cover presented like an object on a shelf, with
+/// quiet editorial text beneath. No card chrome — covers carry the personality.
 class EntryCard extends StatelessWidget {
   const EntryCard({super.key, required this.entry, required this.onTap});
 
@@ -14,121 +18,57 @@ class EntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final meta = [
       entry.creators,
       if (entry.year != null) '${entry.year}',
-    ].where((s) => s.isNotEmpty).join(' · ');
+    ].where((s) => s.isNotEmpty).join('  ·  ');
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AspectRatio(
-              aspectRatio: 2 / 3,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  CoverImage(url: entry.coverUrl),
-                  Positioned(
-                    left: 6,
-                    top: 6,
-                    child: _Badge(
-                      label: entry.categoryEnum.label,
-                      tonal: true,
-                    ),
-                  ),
-                  if (entry.statusEnum != Status.done)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: _Badge(label: entry.statusEnum.label),
-                    ),
-                ],
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: PosterFrame(
+                url: entry.coverUrl,
+                heroTag: 'cover_${entry.id}',
+                fill: true,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          entry.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            height: 1.2,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.secondaryContainer,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          formatScore(entry.overallScore),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: theme.colorScheme.onSecondaryContainer,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    meta.isEmpty ? '—' : meta,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.outline,
-                    ),
-                  ),
-                ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  entry.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.cardTitle(context),
+                ),
               ),
-            ),
+              if (entry.overallScore != null) ...[
+                const SizedBox(width: AppSpacing.xs),
+                ScoreBadge(entry.overallScore),
+              ],
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            meta.isEmpty ? entry.categoryEnum.label : meta,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppText.meta(context),
+          ),
+          if (entry.statusEnum != Status.done) ...[
+            const SizedBox(height: 6),
+            SectionLabel(entry.statusEnum.label),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge({required this.label, this.tonal = false});
-
-  final String label;
-  final bool tonal;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final bg = tonal ? scheme.surface.withValues(alpha: 0.9) : scheme.primary;
-    final fg = tonal ? scheme.onSurface : scheme.onPrimary;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
+        ],
       ),
     );
   }

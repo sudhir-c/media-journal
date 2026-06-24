@@ -5,6 +5,7 @@ import 'app_scope.dart';
 import 'data/database.dart';
 import 'data/entry_repository.dart';
 import 'ui/library_page.dart';
+import 'ui/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,20 +28,12 @@ class MediaJournalApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF18181B),
-      brightness: Brightness.light,
-    );
     return AppScope(
       repo: repo,
       child: MaterialApp(
         title: 'Media Journal',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: scheme,
-          useMaterial3: true,
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-        ),
+        theme: buildAppTheme(),
         home: const LibraryPage(),
       ),
     );

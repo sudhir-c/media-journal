@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="design/app_icon.png" alt="Media Journal app icon — a smiling pixel-art TV" width="128" height="128">
+</p>
+
 # Media Journal (Flutter / macOS)
 
 A personal, single-user desktop app for logging movies, TV, fiction, and
@@ -87,6 +91,13 @@ path (e.g. `~/dev/media_journal_flutter`) or re-enable signing.
 | `flutter analyze` | Static analysis |
 | `flutter test` | Domain unit tests |
 | `flutter build macos --debug` | Build the macOS app |
+| `dart run tool/gen_icon.dart` | Regenerate the app icon PNGs |
+
+## App icon
+
+The smiling pixel-art TV is authored in [`design/app_icon.svg`](design/app_icon.svg).
+Editing the `rects` in [`tool/gen_icon.dart`](tool/gen_icon.dart) and re-running it
+regenerates every size in `macos/Runner/Assets.xcassets/AppIcon.appiconset/`.
 
 ## Feature parity with the web app
 
